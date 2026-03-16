@@ -1,0 +1,14 @@
+node_modules/
+dist/
+build/
+*.bak
+*.exe
+backups/
+backups_metadata.json
+acc-pro/node_modules/
+acc-pro/dist/
+__pycache__/
+.venv/
+venv/
+.env
+*.spec
