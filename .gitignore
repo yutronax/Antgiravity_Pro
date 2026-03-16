@@ -1,14 +1,24 @@
-node_modules/
-dist/
-build/
-*.bak
-*.exe
-backups/
-backups_metadata.json
-acc-pro/node_modules/
-acc-pro/dist/
-__pycache__/
-.venv/
-venv/
-.env
-*.spec
+# Default: Ignore everything
+*
+
+# Allow whitelist
+!acc-pro/
+!acc-pro/**
+!manager_pro.py
+!memory/
+!memory/**
+!AntigravityControlPro.spec
+!.gitignore
+!README.md
+
+# But still ignore these inside allowed folders
+**/node_modules/
+**/dist/
+**/build/
+**/__pycache__/
+**/*.bak
+**/*.exe
+**/backups/
+**/backups_metadata.json
+**/*.pyc
+**/.env
