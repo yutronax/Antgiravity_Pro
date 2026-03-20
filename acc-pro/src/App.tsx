@@ -7,6 +7,7 @@ interface SystemStatus {
   patchActive: boolean;
   rulesPath: string;
   backupCount: number;
+  terminalPolicy: string;
 }
 
 interface Backup {
@@ -27,6 +28,7 @@ declare global {
         get_backups: () => Promise<Backup[]>;
         toggle_favorite: (filename: string) => Promise<{ success: boolean; isFavorite: boolean }>;
         restore_backup: (filename: string) => Promise<{ success: boolean; error?: string }>;
+        set_terminal_policy: (policy: string) => Promise<{ success: boolean; error?: string }>;
       }
     }
   }
@@ -39,7 +41,8 @@ const App: React.FC = () => {
   const [status, setStatus] = useState<SystemStatus>({
     patchActive: false,
     rulesPath: '-',
-    backupCount: 0
+    backupCount: 0,
+    terminalPolicy: 'Off'
   });
   const [loading, setLoading] = useState(true);
   const [patching, setPatching] = useState(false);
@@ -117,6 +120,22 @@ const App: React.FC = () => {
             addNotification('error', 'Background patch process failed.');
         } finally {
             setPatching(false);
+        }
+    }
+  };
+
+  const handleSetPolicy = async (newPolicy: string) => {
+    if (window.pywebview) {
+        try {
+            const res = await window.pywebview.api.set_terminal_policy(newPolicy);
+            if (res.success) {
+                addNotification('success', `Terminal policy updated to ${newPolicy}`);
+                setStatus(prev => ({ ...prev, terminalPolicy: newPolicy }));
+            } else {
+                addNotification('error', `Update failed: ${res.error}`);
+            }
+        } catch (err) {
+            addNotification('error', 'Failed to communicate with system.');
         }
     }
   };
@@ -260,6 +279,30 @@ const App: React.FC = () => {
                       </div>
                       <div className="w-12 h-12 flex items-center justify-center rounded-2xl bg-white/5 group-hover:bg-white/10 transition-all">
                         <ChevronRight className="text-white/40 group-hover:text-white" size={24} />
+                      </div>
+                   </div>
+
+                   {/* Autonomy Policy Card */}
+                   <div className="glass rounded-[2rem] p-8 flex-1 flex flex-col gap-5">
+                      <div className="flex items-center justify-between">
+                         <div className="text-[10px] text-white/30 font-bold tracking-widest uppercase">Agent Autonomy</div>
+                         <Zap size={14} className="text-accent" />
+                      </div>
+                      <div className="flex bg-white/5 p-1.5 rounded-2xl gap-1">
+                         {['Off', 'Auto', 'Turbo'].map((p) => (
+                            <button
+                               key={p}
+                               onClick={() => handleSetPolicy(p)}
+                               className={`flex-1 py-3 rounded-xl text-[11px] font-bold transition-all ${status.terminalPolicy === p ? 'bg-accent text-white shadow-lg shadow-accent/20' : 'text-white/30 hover:bg-white/5 hover:text-white/60'}`}
+                            >
+                               {p.toUpperCase()}
+                            </button>
+                         ))}
+                      </div>
+                      <div className="text-[10px] text-white/20 leading-relaxed italic px-1">
+                         {status.terminalPolicy === 'Turbo' ? 'Warning: Agent will execute all terminal commands automatically.' : 
+                          status.terminalPolicy === 'Auto' ? 'Recommended: Agent auto-executes safe commands, asks for others.' :
+                          'Strict: Permission required for every terminal interaction.'}
                       </div>
                    </div>
                 </div>

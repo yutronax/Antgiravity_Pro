@@ -2,11 +2,13 @@ import os
 import webview
 import json
 import shutil
+import sys
 from datetime import datetime
 import re
 
 # --- CONFIGURATION ---
 RULES_PATH = os.path.expanduser(r"~/.gemini/GEMINI.md")
+SETTINGS_PATH = os.path.expanduser(r"~\AppData\Roaming\Antigravity\User\settings.json")
 MAIN_JS_PATH = r"C:\Users\YUSUF ÇİNAR\AppData\Local\Programs\Antigravity\resources\app\out\jetskiAgent\main.js"
 BACKUP_DIR = r"C:\Users\YUSUF ÇİNAR\AppData\Local\Programs\Antigravity\resources\app\out\jetskiAgent\backups"
 
@@ -15,9 +17,19 @@ class API:
         status = {
             "patchActive": False,
             "rulesPath": RULES_PATH,
-            "backupCount": 0
+            "backupCount": 0,
+            "terminalPolicy": "Off"
         }
         
+        # Read Terminal Policy
+        if os.path.exists(SETTINGS_PATH):
+            try:
+                with open(SETTINGS_PATH, "r", encoding="utf-8") as f:
+                    settings = json.load(f)
+                    status["terminalPolicy"] = settings.get("antigravity.terminalAutoExecutionPolicy", "Off")
+            except:
+                pass
+
         # Check Patch
         if os.path.exists(MAIN_JS_PATH):
             try:
@@ -108,6 +120,25 @@ class API:
             os.makedirs(os.path.dirname(RULES_PATH), exist_ok=True)
             with open(RULES_PATH, "w", encoding="utf-8") as f:
                 f.write(content)
+            return {"success": True}
+        except Exception as e:
+            return {"success": False, "error": str(e)}
+
+    def set_terminal_policy(self, policy):
+        if not os.path.exists(SETTINGS_PATH):
+            settings = {}
+        else:
+            try:
+                with open(SETTINGS_PATH, "r", encoding="utf-8") as f:
+                    settings = json.load(f)
+            except:
+                settings = {}
+        
+        settings["antigravity.terminalAutoExecutionPolicy"] = policy
+        
+        try:
+            with open(SETTINGS_PATH, "w", encoding="utf-8") as f:
+                json.dump(settings, f, indent=4)
             return {"success": True}
         except Exception as e:
             return {"success": False, "error": str(e)}
