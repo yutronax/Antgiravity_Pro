@@ -646,20 +646,22 @@ const FlowView: React.FC<FlowViewProps> = ({ ruleMap, onDelete, onAdd }) => {
     const [hoveredNode, setHoveredNode] = useState<string | null>(null);
     const [drawingEdge, setDrawingEdge] = useState<{ source: string, x: number, y: number } | null>(null);
     const [mousePos, setMousePos] = useState({ x: 0, y: 0 });
-    const [layoutCache, setLayoutCache] = useState<Record<string, {x: number, y: number}>>({});
+    const [layoutCache, setLayoutCache] = useState<Record<string, {x: number, y: number}>>(() => {
+        const saved = localStorage.getItem('antigravity_layout_cache');
+        return saved ? JSON.parse(saved) : {};
+    });
 
     useEffect(() => {
-        if (activeGraph.layout) {
-            setLayoutCache(prev => ({ ...prev, ...activeGraph.layout }));
-        }
-        if (activeGraph.nodes) {
-            const extraLayout: any = {};
-            activeGraph.nodes.forEach((n: any) => {
-                if (n.manual_pos) {
-                    extraLayout[n.id] = n.manual_pos;
-                }
+        if (activeGraph.layout || activeGraph.nodes) {
+            setLayoutCache(prev => {
+                const next = { ...prev };
+                if (activeGraph.layout) Object.assign(next, activeGraph.layout);
+                activeGraph.nodes?.forEach((n: any) => {
+                    if (n.manual_pos) next[n.id] = n.manual_pos;
+                });
+                localStorage.setItem('antigravity_layout_cache', JSON.stringify(next));
+                return next;
             });
-            setLayoutCache(prev => ({ ...prev, ...extraLayout }));
         }
     }, [activeGraph.layout, activeGraph.nodes]);
 
@@ -817,7 +819,7 @@ const FlowView: React.FC<FlowViewProps> = ({ ruleMap, onDelete, onAdd }) => {
 
             <div 
                 id="graph-canvas"
-                className="flex-1 relative glass rounded-[3.5rem] overflow-hidden group select-none"
+                className="flex-1 relative glass rounded-[3.5rem] overflow-hidden group select-none grid-bg"
                 onMouseMove={(e) => {
                     if (drawingEdge) {
                         const rect = e.currentTarget.getBoundingClientRect();
@@ -837,8 +839,9 @@ const FlowView: React.FC<FlowViewProps> = ({ ruleMap, onDelete, onAdd }) => {
                     </defs>
                     
                     {activeGraph.edges?.map((edge, i) => {
-                        const start = activeGraph.layout?.[edge.source];
-                        const end = activeGraph.layout?.[edge.target];
+                        // Use layoutCache for edge stability as well
+                        const start = layoutCache[edge.source] || activeGraph.layout?.[edge.source];
+                        const end = layoutCache[edge.target] || activeGraph.layout?.[edge.target];
                         if (!start || !end) return null;
 
                         const sourceNode = activeGraph.nodes.find(n => n.id === edge.source);
