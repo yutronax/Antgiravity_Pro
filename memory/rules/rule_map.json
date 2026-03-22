@@ -67,39 +67,6 @@
       "scope": "local"
     },
     {
-      "id": "terminal",
-      "file": "memory/rules/terminal.md",
-      "role": "global",
-      "tags": [
-        "command",
-        "shell",
-        "execution"
-      ],
-      "intent": "command_execution",
-      "triggers": [
-        "run",
-        "command",
-        "terminal",
-        "shell",
-        "powershell"
-      ],
-      "patterns": [
-        "\u00e7al\u0131\u015ft\u0131r",
-        "terminal",
-        "komut",
-        "shell",
-        "run"
-      ],
-      "dependencies": [],
-      "successors": [
-        "logging",
-        "terminal_copy_903",
-        "workflow"
-      ],
-      "priority": 75,
-      "scope": "global"
-    },
-    {
       "id": "research",
       "file": "memory/rules/logging.md",
       "role": "optional",
@@ -164,35 +131,40 @@
       "scope": "global"
     },
     {
-      "id": "research_copy_349_copy_358",
-      "file": "memory/rules/logging.md",
-      "role": "optional",
+      "id": "workflow_copy_538",
+      "file": "memory/rules/workflow.md",
+      "role": "base",
       "tags": [
-        "analysis",
-        "article",
-        "study"
+        "task",
+        "plan",
+        "execute"
       ],
-      "intent": "research_analysis",
+      "intent": "task_handling",
       "triggers": [
-        "research",
-        "article",
-        "analyze",
-        "study"
+        "plan",
+        "approve",
+        "execute",
+        "test",
+        "report"
       ],
       "patterns": [
-        "ara\u015ft\u0131rma",
-        "makale",
-        "incele",
-        "konu",
-        "yazma"
+        "ad\u0131m",
+        "plan",
+        "onay",
+        "uygula",
+        "test",
+        "workflow"
       ],
-      "dependencies": [
-        "logging"
-      ],
+      "dependencies": [],
       "successors": [
-        "commit"
+        "testing",
+        "commit",
+        "terminal",
+        "terminal_copy_899",
+        "research",
+        "research_copy_349_copy_358"
       ],
-      "priority": 85,
+      "priority": 80,
       "scope": "local"
     }
   ],

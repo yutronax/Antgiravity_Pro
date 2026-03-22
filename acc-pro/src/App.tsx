@@ -561,12 +561,15 @@ const RuleNode: React.FC<RuleNodeProps> = ({
         const target = e.target as HTMLElement;
         if (target.closest('button') || target.closest('[data-connection-handle]')) return;
         
+        e.preventDefault(); // Prevent pywebview window drag
+        e.stopPropagation();
         isDraggingRef.current = true;
         didDragRef.current = false;
         dragStartRef.current = { x: e.clientX, y: e.clientY, nodeX: pos.x, nodeY: pos.y };
         
-        const handleMove = (ev: PointerEvent) => {
+        const handleMove = (ev: MouseEvent) => {
             if (!isDraggingRef.current || !nodeRef.current) return;
+            ev.preventDefault();
             const dx = ev.clientX - dragStartRef.current.x;
             const dy = ev.clientY - dragStartRef.current.y;
             if (Math.abs(dx) > 3 || Math.abs(dy) > 3) didDragRef.current = true;
@@ -574,10 +577,10 @@ const RuleNode: React.FC<RuleNodeProps> = ({
             nodeRef.current.style.top = `${dragStartRef.current.nodeY + dy}px`;
         };
 
-        const handleUp = (ev: PointerEvent) => {
+        const handleUp = (ev: MouseEvent) => {
             isDraggingRef.current = false;
-            window.removeEventListener('pointermove', handleMove);
-            window.removeEventListener('pointerup', handleUp);
+            window.removeEventListener('mousemove', handleMove);
+            window.removeEventListener('mouseup', handleUp);
             
             if (didDragRef.current) {
                 const dx = ev.clientX - dragStartRef.current.x;
@@ -594,8 +597,8 @@ const RuleNode: React.FC<RuleNodeProps> = ({
             }
         };
 
-        window.addEventListener('pointermove', handleMove);
-        window.addEventListener('pointerup', handleUp);
+        window.addEventListener('mousemove', handleMove);
+        window.addEventListener('mouseup', handleUp);
     };
 
     const isSnapHighlight = snapTarget?.id === node.id;
@@ -603,13 +606,19 @@ const RuleNode: React.FC<RuleNodeProps> = ({
     return (
         <div
             ref={nodeRef}
-            style={{ left: pos.x, top: pos.y }}
+            style={{ left: pos.x, top: pos.y, touchAction: 'none' }}
             className={`absolute w-[180px] p-4 rounded-3xl border cursor-grab active:cursor-grabbing group/node select-none
                 ${bgColor} ${borderColor} ${node.active ? '' : 'hover:border-white/20'} z-10
                 ${isSnapHighlight ? 'ring-2 ring-green-400 ring-offset-2 ring-offset-transparent shadow-[0_0_25px_rgba(0,255,157,0.4)]' : ''}
                 ${node.active ? 'scale-[1.02]' : ''}
                 transition-shadow`}
             onPointerDown={handlePointerDown}
+            onMouseDown={(e) => {
+                // Fallback for pywebview WebView2
+                const target = e.target as HTMLElement;
+                if (target.closest('button') || target.closest('[data-connection-handle]')) return;
+                e.preventDefault();
+            }}
             onPointerEnter={() => {
                 setHoveredNode(node.id);
                 if (drawingEdge && drawingEdge.source !== node.id) {
@@ -952,6 +961,7 @@ const FlowView: React.FC<FlowViewProps> = ({ ruleMap, onDelete, onAdd }) => {
             <div 
                 id="graph-canvas"
                 className="flex-1 relative glass rounded-[3.5rem] overflow-hidden group select-none grid-bg"
+                style={{ touchAction: 'none' }}
                 onMouseMove={(e) => {
                     if (drawingEdge) {
                         const rect = e.currentTarget.getBoundingClientRect();

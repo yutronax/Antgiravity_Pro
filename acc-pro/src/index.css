@@ -25,3 +25,16 @@
   background-image: radial-gradient(circle, rgba(255, 255, 255, 0.05) 1px, transparent 1px);
   background-size: 20px 20px;
 }
+
+/* Pywebview transparent mode fix: prevent window drag on interactive areas */
+#graph-canvas,
+#graph-canvas * {
+  -webkit-app-region: no-drag;
+  touch-action: none;
+}
+
+/* Ensure buttons are always clickable in pywebview */
+button {
+  -webkit-app-region: no-drag;
+  touch-action: manipulation;
+}
