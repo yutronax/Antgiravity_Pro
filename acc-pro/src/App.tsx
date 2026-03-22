@@ -525,9 +525,28 @@ interface FlowViewProps {
     onDelete: (id: string) => void;
     onAdd: (data: any) => void;
 }
+
+interface RuleNodeProps {
+    node: any;
+    pos: { x: number; y: number };
+    score: number;
+    simulationPrompt: string;
+    activeGraph: any;
+    setActiveGraph: React.Dispatch<React.SetStateAction<any>>;
+    setHoveredNode: (id: string | null) => void;
+    hoveredNode: string | null;
+    drawingEdge: { source: string, x: number, y: number } | null;
+    setDrawingEdge: (val: { source: string, x: number, y: number } | null) => void;
+    setSnapTarget: (val: {id: string, x: number, y: number} | null) => void;
+    snapTarget: {id: string, x: number, y: number} | null;
+    onDelete: (id: string) => void;
+}
+
 // --- COMPONENTS ---
 
-const RuleNode = ({ node, pos, score, simulationPrompt, activeGraph, setActiveGraph, setHoveredNode, hoveredNode, drawingEdge, setDrawingEdge, onDelete }: any) => {
+const RuleNode: React.FC<RuleNodeProps> = ({ 
+    node, pos, score, simulationPrompt, activeGraph, setActiveGraph, setHoveredNode, hoveredNode, drawingEdge, setDrawingEdge, setSnapTarget, snapTarget, onDelete 
+}) => {
     const dragControls = useDragControls();
     const bgColor = node.active ? (node.in_flow ? 'bg-green-500/10' : 'bg-accent/10') : 'bg-white/5';
     const borderColor = node.active ? (node.in_flow ? 'border-green-500/40 shadow-[0_0_20px_rgba(16,185,129,0.2)]' : 'border-accent/40 shadow-[0_0_20px_rgba(59,130,246,0.2)]') : 'border-white/10';
@@ -564,13 +583,22 @@ const RuleNode = ({ node, pos, score, simulationPrompt, activeGraph, setActiveGr
              }}
             className={`absolute w-[180px] p-4 rounded-3xl border transition-all cursor-pointer group/node
                 ${bgColor} ${borderColor} ${node.active ? '' : 'hover:border-white/20'} z-10`}
-            onClick={() => setHoveredNode(hoveredNode === node.id ? null : node.id)}
+            onPointerEnter={() => {
+                setHoveredNode(node.id);
+                if (drawingEdge && drawingEdge.source !== node.id) {
+                    setSnapTarget({ id: node.id, x: pos.x, y: pos.y });
+                }
+            }}
+            onPointerLeave={() => {
+                setHoveredNode(null);
+                if (drawingEdge) setSnapTarget(null);
+            }}
             onPointerUp={(e) => {
                 if (drawingEdge && drawingEdge.source !== node.id) {
                     e.stopPropagation();
+                    setSnapTarget(null); // Clear snap explicitly
                     window.pywebview?.api?.add_manual_connection(drawingEdge.source, node.id).then(() => {
                         setDrawingEdge(null);
-                        // Show success notification via activeGraph suggestion placeholder if needed
                         if (window.pywebview?.api?.get_active_graph) {
                             window.pywebview.api.get_active_graph(simulationPrompt).then((g: any) => setActiveGraph(g));
                         }
@@ -664,7 +692,18 @@ const FlowView: React.FC<FlowViewProps> = ({ ruleMap, onDelete, onAdd }) => {
     const [newRule, setNewRule] = useState({ id: '', file: 'memory/rules/', intent: '', patterns: '', dependencies: '', role: 'optional', tags: '' });
     const [hoveredNode, setHoveredNode] = useState<string | null>(null);
     const [drawingEdge, setDrawingEdge] = useState<{ source: string, x: number, y: number } | null>(null);
+    const [snapTarget, setSnapTarget] = useState<{id: string, x: number, y: number} | null>(null);
     const [mousePos, setMousePos] = useState({ x: 0, y: 0 });
+
+    const stringToHash = (s: string) => {
+        let hash = 0;
+        for (let i = 0; i < s.length; i++) {
+            hash = (hash << 5) - hash + s.charCodeAt(i);
+            hash |= 0;
+        }
+        return Math.abs(hash);
+    };
+
     const [layoutCache, setLayoutCache] = useState<Record<string, {x: number, y: number}>>(() => {
         const saved = localStorage.getItem('antigravity_layout_cache');
         return saved ? JSON.parse(saved) : {};
@@ -674,18 +713,26 @@ const FlowView: React.FC<FlowViewProps> = ({ ruleMap, onDelete, onAdd }) => {
         if (activeGraph.layout || activeGraph.nodes) {
             setLayoutCache(prev => {
                 const next = { ...prev };
+                let changed = false;
                 if (activeGraph.layout) {
                     Object.entries(activeGraph.layout).forEach(([id, p]: any) => {
-                        if (p.x > 50 && p.y > 50) next[id] = p;
+                        if (p.x > 50 && p.y > 50 && (prev[id]?.x !== p.x || prev[id]?.y !== p.y)) {
+                            next[id] = p;
+                            changed = true;
+                        }
                     });
                 }
                 activeGraph.nodes?.forEach((n: any) => {
-                    if (n.manual_pos && n.manual_pos.x > 50 && n.manual_pos.y > 50) {
+                    if (n.manual_pos && n.manual_pos.x > 50 && n.manual_pos.y > 50 && (prev[n.id]?.x !== n.manual_pos.x || prev[n.id]?.y !== n.manual_pos.y)) {
                         next[n.id] = n.manual_pos;
+                        changed = true;
                     }
                 });
-                localStorage.setItem('antigravity_layout_cache', JSON.stringify(next));
-                return next;
+                if (changed) {
+                    localStorage.setItem('antigravity_layout_cache', JSON.stringify(next));
+                    return next;
+                }
+                return prev;
             });
         }
     }, [activeGraph.layout, activeGraph.nodes]);
@@ -913,26 +960,32 @@ const FlowView: React.FC<FlowViewProps> = ({ ruleMap, onDelete, onAdd }) => {
                     })}
                     {drawingEdge && (
                         <motion.path 
-                            d={`M ${drawingEdge.x} ${drawingEdge.y} L ${mousePos.x} ${mousePos.y}`}
-                            stroke="#3b82f6" 
-                            strokeWidth={4} 
+                            d={`M ${drawingEdge.x} ${drawingEdge.y} L ${snapTarget ? snapTarget.x + 90 : mousePos.x} ${snapTarget ? snapTarget.y + 40 : mousePos.y}`}
+                            stroke={snapTarget ? "#00ff9d" : "#3b82f6"} 
+                            strokeWidth={snapTarget ? 6 : 4} 
                             fill="none"
-                            animate={{ opacity: [0.4, 0.8, 0.4] }}
-                            transition={{ duration: 1.5, repeat: Infinity }}
+                            animate={{ 
+                                opacity: [0.4, 0.8, 0.4],
+                                strokeDashoffset: [0, -20]
+                            }}
+                            transition={{ duration: 1.5, repeat: Infinity, ease: "linear" }}
                             style={{ 
-                                filter: 'drop-shadow(0 0 12px #3b82f6)',
-                                pointerEvents: 'none' // CRITICAL: Stop the line from intercepting the MouseUp event!
+                                filter: snapTarget ? 'drop-shadow(0 0 15px #00ff9d)' : 'drop-shadow(0 0 12px #3b82f6)',
+                                pointerEvents: 'none',
+                                strokeDasharray: "10 5"
                             }}
                         />
                     )}
                 </svg>
 
                 {activeGraph.nodes?.map((node: any, idx: number) => {
-                    // Use layoutCache as the primary stable source of truth
-                    const pos = layoutCache[node.id] || node.manual_pos || { 
-                        x: (idx % 3) * 250 + 150, 
-                        y: Math.floor(idx / 3) * 180 + 100 
+                    // Deterministik Hash-based Fallback: Nodes will NEVER cluster at 0,0 even without order.
+                    const hash = stringToHash(node.id);
+                    const defaultPos = { 
+                        x: (hash % 4) * 220 + 100, 
+                        y: Math.floor((hash / 4) % 4) * 160 + 100 
                     };
+                    const pos = layoutCache[node.id] || node.manual_pos || defaultPos;
                     const score = activeGraph.trace?.scores?.[node.id];
                     
                     return (
@@ -948,6 +1001,8 @@ const FlowView: React.FC<FlowViewProps> = ({ ruleMap, onDelete, onAdd }) => {
                             hoveredNode={hoveredNode}
                             drawingEdge={drawingEdge}
                             setDrawingEdge={setDrawingEdge}
+                            setSnapTarget={setSnapTarget}
+                            snapTarget={snapTarget}
                             onDelete={onDelete}
                         />
                     );
