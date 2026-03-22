@@ -661,7 +661,7 @@ const RuleNode: React.FC<RuleNodeProps> = ({
                     <button 
                         onPointerDown={(e) => e.stopPropagation()}
                         onMouseDown={(e) => e.stopPropagation()}
-                        onClick={async (e) => { 
+                        onPointerUp={async (e) => { 
                             e.stopPropagation();
                             e.preventDefault();
                             if (window.pywebview?.api?.clone_rule) {
@@ -680,7 +680,7 @@ const RuleNode: React.FC<RuleNodeProps> = ({
                     <button 
                         onPointerDown={(e) => e.stopPropagation()}
                         onMouseDown={(e) => e.stopPropagation()}
-                        onClick={(e) => { 
+                        onPointerUp={(e) => { 
                             e.stopPropagation(); 
                             e.preventDefault();
                             onDelete(node.id); 
@@ -771,16 +771,18 @@ const FlowView: React.FC<FlowViewProps> = ({ ruleMap, onDelete, onAdd }) => {
             setLayoutCache(prev => {
                 const next = { ...prev };
                 let changed = false;
+                // Only apply backend positions for nodes that DON'T already have a local position
+                // This prevents overwriting user-dragged positions with stale backend data
                 if (activeGraph.layout) {
                     Object.entries(activeGraph.layout).forEach(([id, p]: any) => {
-                        if (p.x > 50 && p.y > 50 && (prev[id]?.x !== p.x || prev[id]?.y !== p.y)) {
+                        if (p.x > 50 && p.y > 50 && !prev[id]) {
                             next[id] = p;
                             changed = true;
                         }
                     });
                 }
                 activeGraph.nodes?.forEach((n: any) => {
-                    if (n.manual_pos && n.manual_pos.x > 50 && n.manual_pos.y > 50 && (prev[n.id]?.x !== n.manual_pos.x || prev[n.id]?.y !== n.manual_pos.y)) {
+                    if (n.manual_pos && n.manual_pos.x > 50 && n.manual_pos.y > 50 && !prev[n.id]) {
                         next[n.id] = n.manual_pos;
                         changed = true;
                     }

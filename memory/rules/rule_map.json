@@ -1,42 +1,6 @@
 {
   "rules": [
     {
-      "id": "workflow",
-      "file": "memory/rules/workflow.md",
-      "role": "base",
-      "tags": [
-        "task",
-        "plan",
-        "execute"
-      ],
-      "intent": "task_handling",
-      "triggers": [
-        "plan",
-        "approve",
-        "execute",
-        "test",
-        "report"
-      ],
-      "patterns": [
-        "ad\u0131m",
-        "plan",
-        "onay",
-        "uygula",
-        "test",
-        "workflow"
-      ],
-      "dependencies": [],
-      "successors": [
-        "testing",
-        "commit",
-        "terminal",
-        "terminal_copy_899",
-        "research"
-      ],
-      "priority": 80,
-      "scope": "local"
-    },
-    {
       "id": "commit",
       "file": "memory/rules/commit.md",
       "role": "dependent",
@@ -97,38 +61,6 @@
       ],
       "priority": 85,
       "scope": "local"
-    },
-    {
-      "id": "terminal_copy_899",
-      "file": "memory/rules/terminal.md",
-      "role": "global",
-      "tags": [
-        "command",
-        "shell",
-        "execution"
-      ],
-      "intent": "command_execution",
-      "triggers": [
-        "run",
-        "command",
-        "terminal",
-        "shell",
-        "powershell"
-      ],
-      "patterns": [
-        "\u00e7al\u0131\u015ft\u0131r",
-        "terminal",
-        "komut",
-        "shell",
-        "run"
-      ],
-      "dependencies": [],
-      "successors": [
-        "logging",
-        "workflow"
-      ],
-      "priority": 75,
-      "scope": "global"
     },
     {
       "id": "workflow_copy_538",
