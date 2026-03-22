@@ -29,7 +29,8 @@
       "successors": [
         "testing",
         "commit",
-        "terminal"
+        "terminal",
+        "terminal_copy_899"
       ],
       "priority": 80,
       "scope": "local"

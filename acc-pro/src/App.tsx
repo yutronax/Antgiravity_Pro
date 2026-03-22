@@ -546,10 +546,12 @@ const RuleNode = ({ node, pos, score, simulationPrompt, activeGraph, setActiveGr
             className={`absolute w-[180px] p-4 rounded-3xl border transition-all cursor-pointer group/node
                 ${bgColor} ${borderColor} ${node.active ? '' : 'hover:border-white/20'} z-10`}
             onClick={() => setHoveredNode(hoveredNode === node.id ? null : node.id)}
-            onPointerUp={() => {
+            onPointerUp={(e) => {
                 if (drawingEdge && drawingEdge.source !== node.id) {
+                    e.stopPropagation();
                     window.pywebview?.api?.add_manual_connection(drawingEdge.source, node.id).then(() => {
                         setDrawingEdge(null);
+                        // Show success notification via activeGraph suggestion placeholder if needed
                         if (window.pywebview?.api?.get_active_graph) {
                             window.pywebview.api.get_active_graph(simulationPrompt).then((g: any) => setActiveGraph(g));
                         }
@@ -613,13 +615,12 @@ const RuleNode = ({ node, pos, score, simulationPrompt, activeGraph, setActiveGr
                     <span key={t} className="text-[8px] px-1.5 py-0.5 bg-white/5 rounded-md text-white/30 border border-white/5 italic">#{t}</span>
                 ))}
             </div>
-            <div className="absolute top-1/2 -left-1 w-2 h-2 rounded-full bg-white/10 border border-white/20 -translate-y-1/2" />
+            {/* Invisible larger hit area for easier connection starting */}
             <div 
-                className="absolute top-1/2 -right-1 w-2 h-2 rounded-full bg-white/10 border border-white/20 -translate-y-1/2 cursor-crosshair hover:bg-accent transition-colors z-50"
+                className="absolute top-1/2 -right-3 w-6 h-10 -translate-y-1/2 cursor-crosshair z-40 group-hover:bg-white/5 rounded-full transition-colors"
                 onPointerDown={(e) => {
                     e.stopPropagation();
                     e.preventDefault();
-                    // Use a more specific and stable reference for the graph container
                     const container = document.getElementById('graph-canvas');
                     const crect = container?.getBoundingClientRect();
                     if(crect) {
@@ -631,6 +632,8 @@ const RuleNode = ({ node, pos, score, simulationPrompt, activeGraph, setActiveGr
                     }
                 }}
             />
+            {/* Visual indicator handle */}
+            <div className="absolute top-1/2 -right-1 w-2 h-2 rounded-full bg-white/10 border border-white/20 -translate-y-1/2 pointer-events-none group-hover:bg-accent group-hover:border-accent shadow-[0_0_10px_rgba(59,130,246,0)] group-hover:shadow-[0_0_10px_rgba(59,130,246,0.5)] transition-all" />
         </motion.div>
     );
 };
@@ -643,6 +646,22 @@ const FlowView: React.FC<FlowViewProps> = ({ ruleMap, onDelete, onAdd }) => {
     const [hoveredNode, setHoveredNode] = useState<string | null>(null);
     const [drawingEdge, setDrawingEdge] = useState<{ source: string, x: number, y: number } | null>(null);
     const [mousePos, setMousePos] = useState({ x: 0, y: 0 });
+    const [layoutCache, setLayoutCache] = useState<Record<string, {x: number, y: number}>>({});
+
+    useEffect(() => {
+        if (activeGraph.layout) {
+            setLayoutCache(prev => ({ ...prev, ...activeGraph.layout }));
+        }
+        if (activeGraph.nodes) {
+            const extraLayout: any = {};
+            activeGraph.nodes.forEach((n: any) => {
+                if (n.manual_pos) {
+                    extraLayout[n.id] = n.manual_pos;
+                }
+            });
+            setLayoutCache(prev => ({ ...prev, ...extraLayout }));
+        }
+    }, [activeGraph.layout, activeGraph.nodes]);
 
     useEffect(() => {
         const fetchGraph = async () => {
@@ -860,15 +879,17 @@ const FlowView: React.FC<FlowViewProps> = ({ ruleMap, onDelete, onAdd }) => {
                             fill="none"
                             animate={{ opacity: [0.4, 0.8, 0.4] }}
                             transition={{ duration: 1.5, repeat: Infinity }}
-                            style={{ filter: 'drop-shadow(0 0 12px #3b82f6)' }}
+                            style={{ 
+                                filter: 'drop-shadow(0 0 12px #3b82f6)',
+                                pointerEvents: 'none' // CRITICAL: Stop the line from intercepting the MouseUp event!
+                            }}
                         />
                     )}
                 </svg>
 
                 {activeGraph.nodes?.map((node: any, idx: number) => {
-                    // Critical Fix: Absolute stability. Never use Math.random() in render loop.
-                    // Fallback to a deterministic grid if both layout and manual_pos are missing.
-                    const pos = activeGraph.layout?.[node.id] || node.manual_pos || { 
+                    // Use layoutCache as the primary stable source of truth
+                    const pos = layoutCache[node.id] || node.manual_pos || { 
                         x: (idx % 3) * 250 + 150, 
                         y: Math.floor(idx / 3) * 180 + 100 
                     };
