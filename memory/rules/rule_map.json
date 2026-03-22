@@ -93,7 +93,8 @@
       "dependencies": [],
       "successors": [
         "logging",
-        "terminal_copy_903"
+        "terminal_copy_903",
+        "workflow"
       ],
       "priority": 75,
       "scope": "global"

@@ -651,8 +651,10 @@ const RuleNode: React.FC<RuleNodeProps> = ({
                     )}
                     <button 
                         onPointerDown={(e) => e.stopPropagation()}
+                        onMouseDown={(e) => e.stopPropagation()}
                         onClick={async (e) => { 
-                            e.stopPropagation(); 
+                            e.stopPropagation();
+                            e.preventDefault();
                             if (window.pywebview?.api?.clone_rule) {
                                 const success = await window.pywebview.api.clone_rule(node.id);
                                 if (success && window.pywebview?.api?.get_active_graph) {
@@ -661,18 +663,23 @@ const RuleNode: React.FC<RuleNodeProps> = ({
                                 }
                             }
                         }}
-                        className="opacity-0 group-hover/node:opacity-100 p-1 hover:text-accent transition-opacity cursor-pointer"
+                        className="p-1.5 rounded-lg hover:text-accent hover:bg-accent/10 transition-all cursor-pointer text-white/30"
                         title="Clone Rule"
                     >
-                        <RotateCcw size={12} className="rotate-180" />
+                        <RotateCcw size={14} className="rotate-180" />
                     </button>
                     <button 
                         onPointerDown={(e) => e.stopPropagation()}
-                        onClick={(e) => { e.stopPropagation(); onDelete(node.id); }}
-                        className="opacity-0 group-hover/node:opacity-100 p-1 hover:text-red-400 transition-opacity cursor-pointer"
+                        onMouseDown={(e) => e.stopPropagation()}
+                        onClick={(e) => { 
+                            e.stopPropagation(); 
+                            e.preventDefault();
+                            onDelete(node.id); 
+                        }}
+                        className="p-1.5 rounded-lg hover:text-red-400 hover:bg-red-400/10 transition-all cursor-pointer text-white/30"
                         title="Delete Rule"
                     >
-                        <Trash2 size={12} />
+                        <Trash2 size={14} />
                     </button>
                 </div>
             </div>
@@ -685,10 +692,10 @@ const RuleNode: React.FC<RuleNodeProps> = ({
                     <span key={t} className="text-[8px] px-1.5 py-0.5 bg-white/5 rounded-md text-white/30 border border-white/5 italic">#{t}</span>
                 ))}
             </div>
-            {/* Connection handle */}
+            {/* Connection handle - LARGE visible hitbox */}
             <div 
                 data-connection-handle="true"
-                className="absolute top-1/2 -right-3 w-6 h-10 -translate-y-1/2 cursor-crosshair z-40 group-hover/node:bg-white/5 rounded-full transition-colors"
+                className="absolute top-1/2 -right-4 w-8 h-16 -translate-y-1/2 cursor-crosshair z-40 flex items-center justify-center"
                 onPointerDown={(e) => {
                     e.stopPropagation();
                     e.preventDefault();
@@ -698,10 +705,14 @@ const RuleNode: React.FC<RuleNodeProps> = ({
                         y: pos.y + 50 
                     });
                 }}
-            />
-            {/* Visual dot handles */}
-            <div className="absolute top-1/2 -right-1 w-2 h-2 rounded-full bg-white/10 border border-white/20 -translate-y-1/2 pointer-events-none group-hover/node:bg-accent group-hover/node:border-accent transition-all" />
-            <div className="absolute top-1/2 -left-1 w-2 h-2 rounded-full bg-white/10 border border-white/20 -translate-y-1/2 pointer-events-none" />
+                onMouseDown={(e) => e.stopPropagation()}
+            >
+                <div className="w-4 h-4 rounded-full bg-accent/30 border-2 border-accent/60 hover:bg-accent hover:border-accent hover:scale-150 transition-all" />
+            </div>
+            {/* Left input dot */}
+            <div className="absolute top-1/2 -left-2 w-4 h-4 rounded-full bg-white/10 border-2 border-white/20 -translate-y-1/2 pointer-events-none flex items-center justify-center">
+                <div className="w-2 h-2 rounded-full bg-white/20" />
+            </div>
         </div>
     );
 };
@@ -1049,7 +1060,23 @@ const FlowView: React.FC<FlowViewProps> = ({ ruleMap, onDelete, onAdd }) => {
                             setDrawingEdge={setDrawingEdge}
                             setSnapTarget={setSnapTarget}
                             snapTarget={snapTarget}
-                            onDelete={onDelete}
+                            onDelete={async (id: string) => {
+                                // Call parent delete
+                                onDelete(id);
+                                // Also remove from local graph immediately for instant UI feedback
+                                setActiveGraph((prev: any) => ({
+                                    ...prev,
+                                    nodes: prev.nodes.filter((n: any) => n.id !== id),
+                                    edges: prev.edges.filter((e: any) => e.source !== id && e.target !== id)
+                                }));
+                                // Refresh from backend after a short delay
+                                setTimeout(async () => {
+                                    if (window.pywebview?.api?.get_active_graph) {
+                                        const g = await window.pywebview.api.get_active_graph(simulationPrompt);
+                                        setActiveGraph(g);
+                                    }
+                                }, 500);
+                            }}
                             onUpdatePos={handleUpdatePos}
                         />
                     );
