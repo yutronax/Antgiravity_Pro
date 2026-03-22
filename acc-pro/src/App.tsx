@@ -540,49 +540,68 @@ interface RuleNodeProps {
     setSnapTarget: (val: {id: string, x: number, y: number} | null) => void;
     snapTarget: {id: string, x: number, y: number} | null;
     onDelete: (id: string) => void;
+    onUpdatePos: (id: string, x: number, y: number) => void;
 }
 
 // --- COMPONENTS ---
 
 const RuleNode: React.FC<RuleNodeProps> = ({ 
-    node, pos, score, simulationPrompt, activeGraph, setActiveGraph, setHoveredNode, hoveredNode, drawingEdge, setDrawingEdge, setSnapTarget, snapTarget, onDelete 
+    node, pos, score, simulationPrompt, activeGraph, setActiveGraph, setHoveredNode, hoveredNode, drawingEdge, setDrawingEdge, setSnapTarget, snapTarget, onDelete, onUpdatePos
 }) => {
-    const dragControls = useDragControls();
     const bgColor = node.active ? (node.in_flow ? 'bg-green-500/10' : 'bg-accent/10') : 'bg-white/5';
     const borderColor = node.active ? (node.in_flow ? 'border-green-500/40 shadow-[0_0_20px_rgba(16,185,129,0.2)]' : 'border-accent/40 shadow-[0_0_20px_rgba(59,130,246,0.2)]') : 'border-white/10';
-
     const GRID_SIZE = 20;
+    const isDragging = React.useRef(false);
+    const dragStart = React.useRef({ x: 0, y: 0, nodeX: 0, nodeY: 0 });
+    const nodeRef = React.useRef<HTMLDivElement>(null);
+
+    const handleDragStart = (e: React.PointerEvent) => {
+        e.preventDefault();
+        e.stopPropagation();
+        isDragging.current = true;
+        dragStart.current = { x: e.clientX, y: e.clientY, nodeX: pos.x, nodeY: pos.y };
+        
+        const handleDragMove = (ev: PointerEvent) => {
+            if (!isDragging.current || !nodeRef.current) return;
+            const dx = ev.clientX - dragStart.current.x;
+            const dy = ev.clientY - dragStart.current.y;
+            nodeRef.current.style.left = `${dragStart.current.nodeX + dx}px`;
+            nodeRef.current.style.top = `${dragStart.current.nodeY + dy}px`;
+        };
+
+        const handleDragEnd = (ev: PointerEvent) => {
+            if (!isDragging.current) return;
+            isDragging.current = false;
+            const dx = ev.clientX - dragStart.current.x;
+            const dy = ev.clientY - dragStart.current.y;
+            const rawX = dragStart.current.nodeX + dx;
+            const rawY = dragStart.current.nodeY + dy;
+            const snappedX = Math.round(rawX / GRID_SIZE) * GRID_SIZE;
+            const snappedY = Math.round(rawY / GRID_SIZE) * GRID_SIZE;
+            if (nodeRef.current) {
+                nodeRef.current.style.left = `${snappedX}px`;
+                nodeRef.current.style.top = `${snappedY}px`;
+            }
+            onUpdatePos(node.id, snappedX, snappedY);
+            window.removeEventListener('pointermove', handleDragMove);
+            window.removeEventListener('pointerup', handleDragEnd);
+        };
+
+        window.addEventListener('pointermove', handleDragMove);
+        window.addEventListener('pointerup', handleDragEnd);
+    };
+
+    const isSnapHighlight = snapTarget?.id === node.id;
 
     return (
-        <motion.div
-            key={node.id}
-            layoutId={node.id}
-            drag
-            dragMomentum={false}
-            dragListener={false}
-            dragControls={dragControls}
-            onDragEnd={(_, info) => {
-                const rawX = pos.x + info.offset.x;
-                const rawY = pos.y + info.offset.y;
-                const snappedX = Math.round(rawX / GRID_SIZE) * GRID_SIZE;
-                const snappedY = Math.round(rawY / GRID_SIZE) * GRID_SIZE;
-                window.pywebview?.api?.update_node_position(node.id, snappedX, snappedY);
-                // Proactively update local state for immediate feedback
-                setActiveGraph((prev: any) => ({
-                    ...prev,
-                    layout: { ...prev.layout, [node.id]: { x: snappedX, y: snappedY } }
-                }));
-            }}
-            initial={false}
-            animate={{ 
-                x: pos.x, 
-                y: pos.y, 
-                scale: node.active ? 1.05 : 1, 
-                opacity: 1,
-                boxShadow: node.active ? (node.in_flow ? '0 0 30px rgba(16,185,129,0.3)' : '0 0 30px rgba(59,130,246,0.3)') : 'none'
-             }}
-            className={`absolute w-[180px] p-4 rounded-3xl border transition-all cursor-pointer group/node
-                ${bgColor} ${borderColor} ${node.active ? '' : 'hover:border-white/20'} z-10`}
+        <div
+            ref={nodeRef}
+            style={{ left: pos.x, top: pos.y }}
+            className={`absolute w-[180px] p-4 rounded-3xl border cursor-pointer group/node
+                ${bgColor} ${borderColor} ${node.active ? '' : 'hover:border-white/20'} z-10
+                ${isSnapHighlight ? 'ring-2 ring-green-400 ring-offset-2 ring-offset-transparent shadow-[0_0_25px_rgba(0,255,157,0.4)]' : ''}
+                ${node.active ? 'scale-[1.02]' : ''}
+                transition-shadow`}
             onPointerEnter={() => {
                 setHoveredNode(node.id);
                 if (drawingEdge && drawingEdge.source !== node.id) {
@@ -596,7 +615,7 @@ const RuleNode: React.FC<RuleNodeProps> = ({
             onPointerUp={(e) => {
                 if (drawingEdge && drawingEdge.source !== node.id) {
                     e.stopPropagation();
-                    setSnapTarget(null); // Clear snap explicitly
+                    setSnapTarget(null);
                     window.pywebview?.api?.add_manual_connection(drawingEdge.source, node.id).then(() => {
                         setDrawingEdge(null);
                         if (window.pywebview?.api?.get_active_graph) {
@@ -651,7 +670,7 @@ const RuleNode: React.FC<RuleNodeProps> = ({
             
             <div 
                 className="cursor-grab active:cursor-grabbing select-none"
-                onPointerDown={(e) => dragControls.start(e)}
+                onPointerDown={handleDragStart}
             >
                 <h3 className="font-black text-sm tracking-tight mb-1 truncate">{node.label}</h3>
                 <p className="text-[9px] text-white/40 font-medium uppercase tracking-wider truncate">{node.file.split('/').pop()}</p>
@@ -662,9 +681,9 @@ const RuleNode: React.FC<RuleNodeProps> = ({
                     <span key={t} className="text-[8px] px-1.5 py-0.5 bg-white/5 rounded-md text-white/30 border border-white/5 italic">#{t}</span>
                 ))}
             </div>
-            {/* Invisible larger hit area for easier connection starting */}
+            {/* Connection handle - larger invisible hit area */}
             <div 
-                className="absolute top-1/2 -right-3 w-6 h-10 -translate-y-1/2 cursor-crosshair z-40 group-hover:bg-white/5 rounded-full transition-colors"
+                className="absolute top-1/2 -right-3 w-6 h-10 -translate-y-1/2 cursor-crosshair z-40 group-hover/node:bg-white/5 rounded-full transition-colors"
                 onPointerDown={(e) => {
                     e.stopPropagation();
                     e.preventDefault();
@@ -673,15 +692,17 @@ const RuleNode: React.FC<RuleNodeProps> = ({
                     if(crect) {
                         setDrawingEdge({ 
                             source: node.id, 
-                            x: e.clientX - crect.left, 
-                            y: e.clientY - crect.top 
+                            x: pos.x + 180, 
+                            y: pos.y + 50 
                         });
                     }
                 }}
             />
-            {/* Visual indicator handle */}
-            <div className="absolute top-1/2 -right-1 w-2 h-2 rounded-full bg-white/10 border border-white/20 -translate-y-1/2 pointer-events-none group-hover:bg-accent group-hover:border-accent shadow-[0_0_10px_rgba(59,130,246,0)] group-hover:shadow-[0_0_10px_rgba(59,130,246,0.5)] transition-all" />
-        </motion.div>
+            {/* Visual dot handle */}
+            <div className="absolute top-1/2 -right-1 w-2 h-2 rounded-full bg-white/10 border border-white/20 -translate-y-1/2 pointer-events-none group-hover/node:bg-accent group-hover/node:border-accent transition-all" />
+            {/* Left input dot */}
+            <div className="absolute top-1/2 -left-1 w-2 h-2 rounded-full bg-white/10 border border-white/20 -translate-y-1/2 pointer-events-none" />
+        </div>
     );
 };
 
@@ -693,7 +714,8 @@ const FlowView: React.FC<FlowViewProps> = ({ ruleMap, onDelete, onAdd }) => {
     const [hoveredNode, setHoveredNode] = useState<string | null>(null);
     const [drawingEdge, setDrawingEdge] = useState<{ source: string, x: number, y: number } | null>(null);
     const [snapTarget, setSnapTarget] = useState<{id: string, x: number, y: number} | null>(null);
-    const [mousePos, setMousePos] = useState({ x: 0, y: 0 });
+    const mousePosRef = React.useRef({ x: 0, y: 0 });
+    const drawingLineRef = React.useRef<SVGPathElement>(null);
 
     const stringToHash = (s: string) => {
         let hash = 0;
@@ -708,6 +730,20 @@ const FlowView: React.FC<FlowViewProps> = ({ ruleMap, onDelete, onAdd }) => {
         const saved = localStorage.getItem('antigravity_layout_cache');
         return saved ? JSON.parse(saved) : {};
     });
+
+    // Stable position update handler — no re-render of the whole tree
+    const handleUpdatePos = React.useCallback((id: string, x: number, y: number) => {
+        window.pywebview?.api?.update_node_position(id, x, y);
+        setLayoutCache(prev => {
+            const next = { ...prev, [id]: { x, y } };
+            localStorage.setItem('antigravity_layout_cache', JSON.stringify(next));
+            return next;
+        });
+        setActiveGraph((prev: any) => ({
+            ...prev,
+            layout: { ...prev.layout, [id]: { x, y } }
+        }));
+    }, []);
 
     useEffect(() => {
         if (activeGraph.layout || activeGraph.nodes) {
@@ -907,7 +943,20 @@ const FlowView: React.FC<FlowViewProps> = ({ ruleMap, onDelete, onAdd }) => {
                 onMouseMove={(e) => {
                     if (drawingEdge) {
                         const rect = e.currentTarget.getBoundingClientRect();
-                        setMousePos({ x: e.clientX - rect.left, y: e.clientY - rect.top });
+                        const mx = e.clientX - rect.left;
+                        const my = e.clientY - rect.top;
+                        mousePosRef.current = { x: mx, y: my };
+                        // Direct DOM update — no state, no re-render
+                        if (drawingLineRef.current) {
+                            const tx = snapTarget ? snapTarget.x + 90 : mx;
+                            const ty = snapTarget ? snapTarget.y + 40 : my;
+                            drawingLineRef.current.setAttribute('d', `M ${drawingEdge.x} ${drawingEdge.y} L ${tx} ${ty}`);
+                        }
+                    }
+                }}
+                onMouseUp={() => {
+                    if (drawingEdge && !snapTarget) {
+                        setDrawingEdge(null);
                     }
                 }}
                 onMouseLeave={() => setDrawingEdge(null)}
@@ -959,20 +1008,16 @@ const FlowView: React.FC<FlowViewProps> = ({ ruleMap, onDelete, onAdd }) => {
                         );
                     })}
                     {drawingEdge && (
-                        <motion.path 
-                            d={`M ${drawingEdge.x} ${drawingEdge.y} L ${snapTarget ? snapTarget.x + 90 : mousePos.x} ${snapTarget ? snapTarget.y + 40 : mousePos.y}`}
+                        <path 
+                            ref={drawingLineRef}
+                            d={`M ${drawingEdge.x} ${drawingEdge.y} L ${drawingEdge.x} ${drawingEdge.y}`}
                             stroke={snapTarget ? "#00ff9d" : "#3b82f6"} 
                             strokeWidth={snapTarget ? 6 : 4} 
                             fill="none"
-                            animate={{ 
-                                opacity: [0.4, 0.8, 0.4],
-                                strokeDashoffset: [0, -20]
-                            }}
-                            transition={{ duration: 1.5, repeat: Infinity, ease: "linear" }}
+                            strokeDasharray="10 5"
                             style={{ 
                                 filter: snapTarget ? 'drop-shadow(0 0 15px #00ff9d)' : 'drop-shadow(0 0 12px #3b82f6)',
-                                pointerEvents: 'none',
-                                strokeDasharray: "10 5"
+                                pointerEvents: 'none'
                             }}
                         />
                     )}
@@ -1004,6 +1049,7 @@ const FlowView: React.FC<FlowViewProps> = ({ ruleMap, onDelete, onAdd }) => {
                             setSnapTarget={setSnapTarget}
                             snapTarget={snapTarget}
                             onDelete={onDelete}
+                            onUpdatePos={handleUpdatePos}
                         />
                     );
                 })}

@@ -30,7 +30,8 @@
         "testing",
         "commit",
         "terminal",
-        "terminal_copy_899"
+        "terminal_copy_899",
+        "research"
       ],
       "priority": 80,
       "scope": "local"
@@ -257,6 +258,38 @@
       ],
       "priority": 75,
       "scope": "global"
+    },
+    {
+      "id": "research_copy_349",
+      "file": "memory/rules/logging.md",
+      "role": "optional",
+      "tags": [
+        "analysis",
+        "article",
+        "study"
+      ],
+      "intent": "research_analysis",
+      "triggers": [
+        "research",
+        "article",
+        "analyze",
+        "study"
+      ],
+      "patterns": [
+        "ara\u015ft\u0131rma",
+        "makale",
+        "incele",
+        "konu",
+        "yazma"
+      ],
+      "dependencies": [
+        "logging"
+      ],
+      "successors": [
+        "commit"
+      ],
+      "priority": 85,
+      "scope": "local"
     }
   ],
   "flows": [
