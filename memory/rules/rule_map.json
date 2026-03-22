@@ -37,41 +37,6 @@
       "scope": "local"
     },
     {
-      "id": "logging",
-      "file": "memory/rules/logging.md",
-      "role": "global",
-      "tags": [
-        "system",
-        "log",
-        "trace"
-      ],
-      "intent": "system_logging",
-      "triggers": [
-        "log",
-        "memory",
-        "activity_log",
-        "error",
-        "write"
-      ],
-      "patterns": [
-        "g\u00fcnl\u00fck",
-        "kaydet",
-        "hata",
-        "bellek",
-        "haf\u0131za",
-        "log"
-      ],
-      "dependencies": [],
-      "successors": [
-        "research",
-        "commit",
-        "terminal",
-        "terminal_copy_903"
-      ],
-      "priority": 100,
-      "scope": "global"
-    },
-    {
       "id": "commit",
       "file": "memory/rules/commit.md",
       "role": "dependent",
@@ -134,37 +99,6 @@
       "scope": "global"
     },
     {
-      "id": "testing",
-      "file": "memory/rules/testing.md",
-      "role": "dependent",
-      "tags": [
-        "verify",
-        "check",
-        "qa"
-      ],
-      "intent": "testing_validation",
-      "triggers": [
-        "test",
-        "verify",
-        "check",
-        "ensure"
-      ],
-      "patterns": [
-        "test",
-        "do\u011frula",
-        "kontrol",
-        "verify"
-      ],
-      "dependencies": [
-        "workflow"
-      ],
-      "successors": [
-        "commit"
-      ],
-      "priority": 90,
-      "scope": "local"
-    },
-    {
       "id": "research",
       "file": "memory/rules/logging.md",
       "role": "optional",
@@ -222,45 +156,14 @@
       ],
       "dependencies": [],
       "successors": [
-        "logging"
-      ],
-      "priority": 75,
-      "scope": "global"
-    },
-    {
-      "id": "terminal_copy_903",
-      "file": "memory/rules/terminal.md",
-      "role": "global",
-      "tags": [
-        "command",
-        "shell",
-        "execution"
-      ],
-      "intent": "command_execution",
-      "triggers": [
-        "run",
-        "command",
-        "terminal",
-        "shell",
-        "powershell"
-      ],
-      "patterns": [
-        "\u00e7al\u0131\u015ft\u0131r",
-        "terminal",
-        "komut",
-        "shell",
-        "run"
-      ],
-      "dependencies": [],
-      "successors": [
         "logging",
-        "terminal_copy_899"
+        "workflow"
       ],
       "priority": 75,
       "scope": "global"
     },
     {
-      "id": "research_copy_349",
+      "id": "research_copy_349_copy_358",
       "file": "memory/rules/logging.md",
       "role": "optional",
       "tags": [
@@ -324,9 +227,6 @@
   ],
   "dependencies": {
     "commit": [
-      "workflow"
-    ],
-    "testing": [
       "workflow"
     ],
     "research": [

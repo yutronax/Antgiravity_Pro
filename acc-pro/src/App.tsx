@@ -551,44 +551,51 @@ const RuleNode: React.FC<RuleNodeProps> = ({
     const bgColor = node.active ? (node.in_flow ? 'bg-green-500/10' : 'bg-accent/10') : 'bg-white/5';
     const borderColor = node.active ? (node.in_flow ? 'border-green-500/40 shadow-[0_0_20px_rgba(16,185,129,0.2)]' : 'border-accent/40 shadow-[0_0_20px_rgba(59,130,246,0.2)]') : 'border-white/10';
     const GRID_SIZE = 20;
-    const isDragging = React.useRef(false);
-    const dragStart = React.useRef({ x: 0, y: 0, nodeX: 0, nodeY: 0 });
+    const isDraggingRef = React.useRef(false);
+    const dragStartRef = React.useRef({ x: 0, y: 0, nodeX: 0, nodeY: 0 });
     const nodeRef = React.useRef<HTMLDivElement>(null);
+    const didDragRef = React.useRef(false);
 
-    const handleDragStart = (e: React.PointerEvent) => {
-        e.preventDefault();
-        e.stopPropagation();
-        isDragging.current = true;
-        dragStart.current = { x: e.clientX, y: e.clientY, nodeX: pos.x, nodeY: pos.y };
+    const handlePointerDown = (e: React.PointerEvent) => {
+        // Don't start drag from buttons or connection handle
+        const target = e.target as HTMLElement;
+        if (target.closest('button') || target.closest('[data-connection-handle]')) return;
         
-        const handleDragMove = (ev: PointerEvent) => {
-            if (!isDragging.current || !nodeRef.current) return;
-            const dx = ev.clientX - dragStart.current.x;
-            const dy = ev.clientY - dragStart.current.y;
-            nodeRef.current.style.left = `${dragStart.current.nodeX + dx}px`;
-            nodeRef.current.style.top = `${dragStart.current.nodeY + dy}px`;
+        isDraggingRef.current = true;
+        didDragRef.current = false;
+        dragStartRef.current = { x: e.clientX, y: e.clientY, nodeX: pos.x, nodeY: pos.y };
+        
+        const handleMove = (ev: PointerEvent) => {
+            if (!isDraggingRef.current || !nodeRef.current) return;
+            const dx = ev.clientX - dragStartRef.current.x;
+            const dy = ev.clientY - dragStartRef.current.y;
+            if (Math.abs(dx) > 3 || Math.abs(dy) > 3) didDragRef.current = true;
+            nodeRef.current.style.left = `${dragStartRef.current.nodeX + dx}px`;
+            nodeRef.current.style.top = `${dragStartRef.current.nodeY + dy}px`;
         };
 
-        const handleDragEnd = (ev: PointerEvent) => {
-            if (!isDragging.current) return;
-            isDragging.current = false;
-            const dx = ev.clientX - dragStart.current.x;
-            const dy = ev.clientY - dragStart.current.y;
-            const rawX = dragStart.current.nodeX + dx;
-            const rawY = dragStart.current.nodeY + dy;
-            const snappedX = Math.round(rawX / GRID_SIZE) * GRID_SIZE;
-            const snappedY = Math.round(rawY / GRID_SIZE) * GRID_SIZE;
-            if (nodeRef.current) {
-                nodeRef.current.style.left = `${snappedX}px`;
-                nodeRef.current.style.top = `${snappedY}px`;
+        const handleUp = (ev: PointerEvent) => {
+            isDraggingRef.current = false;
+            window.removeEventListener('pointermove', handleMove);
+            window.removeEventListener('pointerup', handleUp);
+            
+            if (didDragRef.current) {
+                const dx = ev.clientX - dragStartRef.current.x;
+                const dy = ev.clientY - dragStartRef.current.y;
+                const rawX = dragStartRef.current.nodeX + dx;
+                const rawY = dragStartRef.current.nodeY + dy;
+                const snappedX = Math.round(rawX / GRID_SIZE) * GRID_SIZE;
+                const snappedY = Math.round(rawY / GRID_SIZE) * GRID_SIZE;
+                if (nodeRef.current) {
+                    nodeRef.current.style.left = `${snappedX}px`;
+                    nodeRef.current.style.top = `${snappedY}px`;
+                }
+                onUpdatePos(node.id, snappedX, snappedY);
             }
-            onUpdatePos(node.id, snappedX, snappedY);
-            window.removeEventListener('pointermove', handleDragMove);
-            window.removeEventListener('pointerup', handleDragEnd);
         };
 
-        window.addEventListener('pointermove', handleDragMove);
-        window.addEventListener('pointerup', handleDragEnd);
+        window.addEventListener('pointermove', handleMove);
+        window.addEventListener('pointerup', handleUp);
     };
 
     const isSnapHighlight = snapTarget?.id === node.id;
@@ -597,11 +604,12 @@ const RuleNode: React.FC<RuleNodeProps> = ({
         <div
             ref={nodeRef}
             style={{ left: pos.x, top: pos.y }}
-            className={`absolute w-[180px] p-4 rounded-3xl border cursor-pointer group/node
+            className={`absolute w-[180px] p-4 rounded-3xl border cursor-grab active:cursor-grabbing group/node select-none
                 ${bgColor} ${borderColor} ${node.active ? '' : 'hover:border-white/20'} z-10
                 ${isSnapHighlight ? 'ring-2 ring-green-400 ring-offset-2 ring-offset-transparent shadow-[0_0_25px_rgba(0,255,157,0.4)]' : ''}
                 ${node.active ? 'scale-[1.02]' : ''}
                 transition-shadow`}
+            onPointerDown={handlePointerDown}
             onPointerEnter={() => {
                 setHoveredNode(node.id);
                 if (drawingEdge && drawingEdge.source !== node.id) {
@@ -612,9 +620,8 @@ const RuleNode: React.FC<RuleNodeProps> = ({
                 setHoveredNode(null);
                 if (drawingEdge) setSnapTarget(null);
             }}
-            onPointerUp={(e) => {
+            onPointerUp={() => {
                 if (drawingEdge && drawingEdge.source !== node.id) {
-                    e.stopPropagation();
                     setSnapTarget(null);
                     window.pywebview?.api?.add_manual_connection(drawingEdge.source, node.id).then(() => {
                         setDrawingEdge(null);
@@ -627,7 +634,7 @@ const RuleNode: React.FC<RuleNodeProps> = ({
         >
             {node.is_current && (
                 <motion.div 
-                    className="absolute inset-0 rounded-3xl border-2 border-accent"
+                    className="absolute inset-0 rounded-3xl border-2 border-accent pointer-events-none"
                     animate={{ scale: [1, 1.05, 1], opacity: [0.5, 0, 0.5] }}
                     transition={{ duration: 2, repeat: Infinity, ease: "easeInOut" }}
                 />
@@ -643,6 +650,7 @@ const RuleNode: React.FC<RuleNodeProps> = ({
                         </span>
                     )}
                     <button 
+                        onPointerDown={(e) => e.stopPropagation()}
                         onClick={async (e) => { 
                             e.stopPropagation(); 
                             if (window.pywebview?.api?.clone_rule) {
@@ -653,14 +661,15 @@ const RuleNode: React.FC<RuleNodeProps> = ({
                                 }
                             }
                         }}
-                        className="opacity-0 group-hover/node:opacity-100 p-1 hover:text-accent transition-opacity"
+                        className="opacity-0 group-hover/node:opacity-100 p-1 hover:text-accent transition-opacity cursor-pointer"
                         title="Clone Rule"
                     >
                         <RotateCcw size={12} className="rotate-180" />
                     </button>
                     <button 
+                        onPointerDown={(e) => e.stopPropagation()}
                         onClick={(e) => { e.stopPropagation(); onDelete(node.id); }}
-                        className="opacity-0 group-hover/node:opacity-100 p-1 hover:text-red-400 transition-opacity"
+                        className="opacity-0 group-hover/node:opacity-100 p-1 hover:text-red-400 transition-opacity cursor-pointer"
                         title="Delete Rule"
                     >
                         <Trash2 size={12} />
@@ -668,44 +677,36 @@ const RuleNode: React.FC<RuleNodeProps> = ({
                 </div>
             </div>
             
-            <div 
-                className="cursor-grab active:cursor-grabbing select-none"
-                onPointerDown={handleDragStart}
-            >
-                <h3 className="font-black text-sm tracking-tight mb-1 truncate">{node.label}</h3>
-                <p className="text-[9px] text-white/40 font-medium uppercase tracking-wider truncate">{node.file.split('/').pop()}</p>
-            </div>
+            <h3 className="font-black text-sm tracking-tight mb-1 truncate">{node.label}</h3>
+            <p className="text-[9px] text-white/40 font-medium uppercase tracking-wider truncate">{node.file.split('/').pop()}</p>
             
             <div className="mt-3 flex flex-wrap gap-1">
                 {node.tags?.map((t: string) => (
                     <span key={t} className="text-[8px] px-1.5 py-0.5 bg-white/5 rounded-md text-white/30 border border-white/5 italic">#{t}</span>
                 ))}
             </div>
-            {/* Connection handle - larger invisible hit area */}
+            {/* Connection handle */}
             <div 
+                data-connection-handle="true"
                 className="absolute top-1/2 -right-3 w-6 h-10 -translate-y-1/2 cursor-crosshair z-40 group-hover/node:bg-white/5 rounded-full transition-colors"
                 onPointerDown={(e) => {
                     e.stopPropagation();
                     e.preventDefault();
-                    const container = document.getElementById('graph-canvas');
-                    const crect = container?.getBoundingClientRect();
-                    if(crect) {
-                        setDrawingEdge({ 
-                            source: node.id, 
-                            x: pos.x + 180, 
-                            y: pos.y + 50 
-                        });
-                    }
+                    setDrawingEdge({ 
+                        source: node.id, 
+                        x: pos.x + 180, 
+                        y: pos.y + 50 
+                    });
                 }}
             />
-            {/* Visual dot handle */}
+            {/* Visual dot handles */}
             <div className="absolute top-1/2 -right-1 w-2 h-2 rounded-full bg-white/10 border border-white/20 -translate-y-1/2 pointer-events-none group-hover/node:bg-accent group-hover/node:border-accent transition-all" />
-            {/* Left input dot */}
             <div className="absolute top-1/2 -left-1 w-2 h-2 rounded-full bg-white/10 border border-white/20 -translate-y-1/2 pointer-events-none" />
         </div>
     );
 };
 
+        
 const FlowView: React.FC<FlowViewProps> = ({ ruleMap, onDelete, onAdd }) => {
     const [isAdding, setIsAdding] = useState(false);
     const [simulationPrompt, setSimulationPrompt] = useState("");
