@@ -1,5 +1,24 @@
 import React, { useState, useEffect } from 'react';
-import { Settings, Shield, Zap, FileText, ChevronRight, Activity, Cpu, RotateCcw, Layout, Plus, Trash2, Link as LinkIcon, Search, Box, Share2 } from 'lucide-react';
+import { 
+  Settings, 
+  Shield, 
+  Zap, 
+  FileText, 
+  ChevronRight, 
+  Activity, 
+  Cpu, 
+  RotateCcw, 
+  Layout, 
+  Plus, 
+  Trash2, 
+  Link as LinkIcon, 
+  Search, 
+  Box, 
+  Share2, 
+  Check, 
+  X, 
+  RefreshCw 
+} from 'lucide-react';
 import { motion, AnimatePresence, Reorder, useDragControls } from 'framer-motion';
 
 // --- TYPES ---
@@ -539,7 +558,7 @@ const RuleNode = ({ node, pos, score, simulationPrompt, activeGraph, setActiveGr
             animate={{ 
                 x: pos.x, 
                 y: pos.y, 
-                scale: 1, 
+                scale: node.active ? 1.05 : 1, 
                 opacity: 1,
                 boxShadow: node.active ? (node.in_flow ? '0 0 30px rgba(16,185,129,0.3)' : '0 0 30px rgba(59,130,246,0.3)') : 'none'
              }}
@@ -655,9 +674,15 @@ const FlowView: React.FC<FlowViewProps> = ({ ruleMap, onDelete, onAdd }) => {
         if (activeGraph.layout || activeGraph.nodes) {
             setLayoutCache(prev => {
                 const next = { ...prev };
-                if (activeGraph.layout) Object.assign(next, activeGraph.layout);
+                if (activeGraph.layout) {
+                    Object.entries(activeGraph.layout).forEach(([id, p]: any) => {
+                        if (p.x > 50 && p.y > 50) next[id] = p;
+                    });
+                }
                 activeGraph.nodes?.forEach((n: any) => {
-                    if (n.manual_pos) next[n.id] = n.manual_pos;
+                    if (n.manual_pos && n.manual_pos.x > 50 && n.manual_pos.y > 50) {
+                        next[n.id] = n.manual_pos;
+                    }
                 });
                 localStorage.setItem('antigravity_layout_cache', JSON.stringify(next));
                 return next;
@@ -796,6 +821,18 @@ const FlowView: React.FC<FlowViewProps> = ({ ruleMap, onDelete, onAdd }) => {
                                         />
                                     </div>
                                     <button 
+                            onClick={() => {
+                                localStorage.removeItem('antigravity_layout_cache');
+                                setLayoutCache({});
+                                window.location.reload();
+                            }}
+                            className="p-2 bg-white/5 border border-white/10 rounded-xl hover:bg-white/10 transition-colors flex items-center gap-2 group"
+                            title="Reset Layout"
+                        >
+                            <Layout className="w-4 h-4 text-white/40 group-hover:text-white" />
+                            <span className="text-xs text-white/40 group-hover:text-white">Reset Layout</span>
+                        </button>
+                        <button 
                                         onClick={() => {
                                             onAdd({
                                                 ...newRule,

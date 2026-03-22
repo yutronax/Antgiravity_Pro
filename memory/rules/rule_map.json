@@ -64,7 +64,8 @@
       "successors": [
         "research",
         "commit",
-        "terminal"
+        "terminal",
+        "terminal_copy_903"
       ],
       "priority": 100,
       "scope": "global"
@@ -251,7 +252,8 @@
       ],
       "dependencies": [],
       "successors": [
-        "logging"
+        "logging",
+        "terminal_copy_899"
       ],
       "priority": 75,
       "scope": "global"

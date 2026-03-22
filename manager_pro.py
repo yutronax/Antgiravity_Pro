@@ -140,7 +140,15 @@ class RuleRouter:
         if os.path.exists(LAYOUT_PATH):
             try:
                 with open(LAYOUT_PATH, 'r', encoding='utf-8') as f:
-                    return json.load(f)
+                    data = json.load(f)
+                    # Sanitization: Ensure coordinates are valid numbers and not too small
+                    sanitized = {}
+                    for node_id, pos in data.items():
+                        if isinstance(pos, dict) and 'x' in pos and 'y' in pos:
+                            # If coordinates are at edge/zero, discard them to trigger re-assignment
+                            if pos['x'] > 50 and pos['y'] > 50:
+                                sanitized[node_id] = pos
+                    return sanitized
             except: pass
         return {}
 
